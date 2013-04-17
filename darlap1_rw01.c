@@ -57,8 +57,9 @@ int main(int argc, char *argv[]){
 		printf("Failas tuscias\n");
 	else if(br == -1)
 		printf("Nepavyko perskaityti failo\n");
-	write(rd, (void*)arr, br);
-	close(rd);
+	printf("%d baitu perskaityta\n", br);
+	write(wd, (void*)arr, br);
+	close(wd);
 	close(rd);
 	return 0;
 }
