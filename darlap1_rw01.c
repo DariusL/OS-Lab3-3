@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 
+int rd;
+int wd;
+
 int dl_parse_char(char *nr){
 	int ret = 0;
 	int tmp = 0;
@@ -24,43 +27,51 @@ int dl_parse_char(char *nr){
 	return ret;
 }
 
+void dl_exit(int code){
+	close(wd);
+	close(rd);
+	exit(code);
+}
+
 int main(int argc, char *argv[]){
-	int rd;
-	int wd;
 	int b;
 	int br;
 	char *arr;
+	rd = 0;
+	wd = 0;
 	printf( "(C) 2013 Lapunas Darius, %s\n", __FILE__ );
 	if(argc != 4){
 		printf("1 argumentas - failas skaitymui\n2 argumentas - failas rasymui\n\
-				3 argumentas - kiek baitu kopijuot\n");
-		return 1;
+3 argumentas - kiek baitu kopijuot\n");
+		dl_exit(1);
 	}
 	rd = open(argv[1], O_RDONLY);
 	if(rd == -1){
 		printf("Nepavyko atidaryti pirmo failo\n");
-		return 1;
+		dl_exit(1);
 	}
 	wd = open(argv[2], O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU|S_IWGRP|S_IROTH);
 	if(wd == -1){
 		printf("Nepavyko sukurti antro failo\n");
-		return 1;
+		dl_exit(1);
 	}
 	b = dl_parse_char(argv[3]);
 	if(b == 0){
 		printf("Netinkamas baitu skaicius\n");
-		return 1;
+		dl_exit(1);
 	}
 	arr = malloc(b);
 	br = read(rd, (void*)arr, b);
-	if(br == 0)
+	if(br == 0){
 		printf("Failas tuscias\n");
-	else if(br == -1)
+		dl_exit(1);
+	}
+	else if(br == -1){
 		printf("Nepavyko perskaityti failo\n");
-	printf("%d baitu perskaityta\n", br);
+		dl_exit(1);
+	}
 	write(wd, (void*)arr, br);
-	close(wd);
-	close(rd);
+	dl_exit(0);
 	return 0;
 }
 
