@@ -11,9 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define chunkSize 1024
-#define chunkCount 1024
-#define bufferSize 1048576
+static const int bufferSize = 1048576;
 
 int rd;
 
@@ -22,59 +20,50 @@ void dl_exit(int code){
 	exit(code);
 }
 
-int dl_read_chunks(int desc, struct aiocb *blocks[], char *buf){
-	struct aiocb *temp;
-	int i;
-	memset((void*)blocks, 0, sizeof(struct aiocb) * chunkCount);
-	for(i = 0; i < chunkCount; i++){
-		temp = blocks[i];
-		temp->aio_fildes = desc;
-		temp->aio_buf = buf + i * chunkSize;
-		temp->aio_nbytes = chunkSize;
-		temp->aio_offset = i * chunkSize;
-		if(aio_read(temp) != 0){
-			printf("Kazkas sprogo pradedant skaityt\n");
-			return -1;
-		}
+int dl_read_bytes(int desc, struct aiocb *block, char *buf, int bufOffset, int bytes){
+	memset((void*)block, 0, sizeof(struct aiocb));
+	block->aio_fildes = desc;
+	block->aio_buf = buf + bufOffset;
+	block->aio_nbytes = bytes;
+	block->aio_offset = 0;
+	if(aio_read(block) != 0){
+		printf("Kazkas sprogo pradedant skaityt\n");
+		return -1;
 	}
 	return 0;
 }
 
-int dl_read_wait(struct aiocb *blocks[]){
-	int i, n;
-	struct aiocb *temp;
-	const struct aiocb *arr[chunkCount];
-	memcpy(arr, blocks, sizeof(struct aiocb) * chunkCount);
-	n = 0;
-	if(aio_suspend(arr, chunkCount, NULL) != 0){
+int dl_read_wait(struct aiocb *block){
+	const struct aiocb *temp[1];
+	temp[0] = block;
+	if(aio_suspend(temp, 1, NULL) != 0){
 		printf("Kazkas sprogo baigiant skaityt\n");
 		return -1;
 	}
-	for(i = 0; i < chunkCount; i++){
-		temp = blocks[i];
-		n += aio_return(temp);
-	}
-	return n;
+	return aio_return(block);
 }
 
 int main(){
-	struct aiocb **blocks;
-	char buf[bufferSize];
-	int n;
-	blocks = malloc(sizeof(struct aiocb) * chunkCount);
+	struct aiocb block;
+	char *buf;
+	int n = 0, t;
+	buf = malloc(bufferSize);
 	printf( "(C) 2013 Lapunas Darius, %s\n", __FILE__ );
 	rd = open("/dev/urandom", O_RDONLY);
 	if(rd == -1){
 		printf("Kazkas sprogo atidarant faila\n");
 		dl_exit(1);
 	}
-	if(dl_read_chunks(rd, blocks, buf) == -1)
-		dl_exit(1);
-	n = dl_read_wait(blocks);
-	if(n > 0)
-		printf("Perskaityta %d baitu\n", n);
-	else
-		dl_exit(1);
+	while(n < bufferSize){
+		if(dl_read_bytes(rd, &block, buf, n, bufferSize - n) != 0)
+			dl_exit(1);
+		t = dl_read_wait(&block);
+		if(t > 0){
+			n += t;
+			printf("Perskaityta %d baitu\n", n);
+		}else
+			dl_exit(1);
+	}
 	dl_exit(0);
 	return 0;
 }
